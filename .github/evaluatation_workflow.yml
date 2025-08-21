@@ -1,0 +1,115 @@
+name: Agent Evaluation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    
+    services:
+      # Add a local API service
+      api:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: chinook
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      working-directory: ./backend
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Set up environment variables
+      working-directory: ./backend
+      run: |
+        echo "AZURE_OPENAI_DEPLOYMENT_NAME=${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}" >> .env
+        echo "AZURE_OPENAI_API_KEY=${{ secrets.AZURE_OPENAI_API_KEY }}" >> .env
+        echo "AZURE_OPENAI_ENDPOINT=${{ secrets.AZURE_OPENAI_ENDPOINT }}" >> .env
+        echo "AZURE_OPENAI_API_VERSION=${{ secrets.AZURE_OPENAI_API_VERSION }}" >> .env
+        echo "APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}" >> .env
+        echo "AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED=true" >> .env
+        echo "AZURE_SDK_TRACING_IMPLEMENTATION=opentelemetry" >> .env
+        echo "PG_VECTOR_HOST=localhost" >> .env
+        echo "PG_VECTOR_USER=postgres" >> .env
+        echo "PGPORT=5432" >> .env
+        echo "PGDATABASE=chinook" >> .env
+        echo "PG_VECTOR_PASSWORD=postgres" >> .env
+        
+    - name: Setup database
+      working-directory: ./backend
+      run: |
+        # Import Chinook DB into Postgres if needed
+        # Example: psql -h localhost -U postgres -d chinook -f ./path/to/chinook.sql
+        
+    - name: Start API server in background
+      working-directory: ./backend
+      run: |
+        uvicorn main:app --host 0.0.0.0 --port 8000 &
+        # Wait for API to become available
+        sleep 10
+        
+    - name: Run evaluation
+      working-directory: ./backend/evaluations
+      run: |
+        python evaluation.py
+        
+    - name: Upload evaluation results
+      uses: actions/upload-artifact@v3
+      with:
+        name: evaluation-results
+        path: ./backend/evaluations/data/evaluation_output.json
+        
+    - name: Parse and display evaluation summary
+      working-directory: ./backend/evaluations
+      run: |
+        python -c "
+import json
+import statistics
+
+# Load results
+with open('./data/evaluation_output.json', 'r') as f:
+    data = json.load(f)
+    
+# Calculate metrics
+relevance_scores = [item['RelevanceScore'] for item in data['Results']]
+similarity_scores = [item['SimilarityScore'] for item in data['Results']]
+
+avg_relevance = statistics.mean(relevance_scores)
+avg_similarity = statistics.mean(similarity_scores)
+
+# Print summary
+print(f'### Evaluation Summary ###')
+print(f'Number of questions evaluated: {len(data['Results'])}')
+print(f'Average Relevance Score: {avg_relevance:.2f}')
+print(f'Average Similarity Score: {avg_similarity:.2f}')
+print('')
+print('Individual Scores:')
+for i, item in enumerate(data['Results']):
+    print(f'Question {i+1}: Relevance={item['RelevanceScore']:.2f}, Similarity={item['SimilarityScore']:.2f}')
+        "
