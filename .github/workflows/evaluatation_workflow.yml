@@ -91,6 +91,7 @@ jobs:
         python -c "
         import json
         import statistics
+        import sys
         
         # Load results
         with open('./data/evaluation_output.json', 'r') as f:
@@ -112,4 +113,16 @@ jobs:
         print('Individual Scores:')
         for i, item in enumerate(data['Results']):
             print(f'Question {i+1}: Relevance={item[\"RelevanceScore\"]:.2f}, Similarity={item[\"SimilarityScore\"]:.2f}')
+        
+        # Check if scores meet threshold
+        threshold = 4.0
+        if avg_relevance < threshold or avg_similarity < threshold:
+            print(f'\\n❌ EVALUATION FAILED: Scores are below threshold of {threshold}')
+            if avg_relevance < threshold:
+                print(f'  - Relevance score {avg_relevance:.2f} is below threshold')
+            if avg_similarity < threshold:
+                print(f'  - Similarity score {avg_similarity:.2f} is below threshold')
+            sys.exit(1)  # Exit with error code to fail the workflow
+        else:
+            print(f'\\n✅ EVALUATION PASSED: All scores are above threshold of {threshold}')
         "
