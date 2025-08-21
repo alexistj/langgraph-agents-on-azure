@@ -89,27 +89,27 @@ jobs:
       working-directory: ./backend/evaluations
       run: |
         python -c "
-import json
-import statistics
-
-# Load results
-with open('./data/evaluation_output.json', 'r') as f:
-    data = json.load(f)
-    
-# Calculate metrics
-relevance_scores = [item['RelevanceScore'] for item in data['Results']]
-similarity_scores = [item['SimilarityScore'] for item in data['Results']]
-
-avg_relevance = statistics.mean(relevance_scores)
-avg_similarity = statistics.mean(similarity_scores)
-
-# Print summary
-print(f'### Evaluation Summary ###')
-print(f'Number of questions evaluated: {len(data['Results'])}')
-print(f'Average Relevance Score: {avg_relevance:.2f}')
-print(f'Average Similarity Score: {avg_similarity:.2f}')
-print('')
-print('Individual Scores:')
-for i, item in enumerate(data['Results']):
-    print(f'Question {i+1}: Relevance={item['RelevanceScore']:.2f}, Similarity={item['SimilarityScore']:.2f}')
+        import json
+        import statistics
+        
+        # Load results
+        with open('./data/evaluation_output.json', 'r') as f:
+            data = json.load(f)
+            
+        # Calculate metrics
+        relevance_scores = [item['RelevanceScore'] for item in data['Results']]
+        similarity_scores = [item['SimilarityScore'] for item in data['Results']]
+        
+        avg_relevance = statistics.mean(relevance_scores)
+        avg_similarity = statistics.mean(similarity_scores)
+        
+        # Print summary
+        print(f'### Evaluation Summary ###')
+        print(f'Number of questions evaluated: {len(data[\"Results\"])}')
+        print(f'Average Relevance Score: {avg_relevance:.2f}')
+        print(f'Average Similarity Score: {avg_similarity:.2f}')
+        print('')
+        print('Individual Scores:')
+        for i, item in enumerate(data['Results']):
+            print(f'Question {i+1}: Relevance={item[\"RelevanceScore\"]:.2f}, Similarity={item[\"SimilarityScore\"]:.2f}')
         "
